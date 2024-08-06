@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jmnjung/rssagg/internal/database"
 )
 
 func handlerHealthz(w http.ResponseWriter, req *http.Request) {
@@ -12,6 +16,33 @@ func handlerHealthz(w http.ResponseWriter, req *http.Request) {
 
 func handlerErr(w http.ResponseWriter, req *http.Request) {
 	respondWithError(w, http.StatusInternalServerError, "Internal Server Error")
+}
+
+func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request) {
+	type parameters struct {
+		Name string `json:"name"`
+	}
+
+	decoder := json.NewDecoder(req.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not decode parameters")
+		return
+	}
+
+	user, err := cfg.DB.CreateUser(req.Context(), database.CreateUserParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+		Name:      params.Name,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not create user")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, databaseUserToUser(user))
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
