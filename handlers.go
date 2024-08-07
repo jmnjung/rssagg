@@ -98,6 +98,16 @@ func (cfg *apiConfig) handlerCreateFeed(w http.ResponseWriter, req *http.Request
 	respondWithJSON(w, http.StatusOK, databaseFeedtoFeed(feed))
 }
 
+func (cfg *apiConfig) handlerGetAllFeeds(w http.ResponseWriter, req *http.Request) {
+	dbFeeds, err := cfg.DB.GetFeeds(req.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not get feeds")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, databaseFeedstoFeeds(dbFeeds))
+}
+
 func respondWithError(w http.ResponseWriter, code int, msg string) {
 	if code >= 500 {
 		log.Printf("Responding with 5XX error: %s", msg)
