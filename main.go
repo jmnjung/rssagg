@@ -15,6 +15,8 @@ type apiConfig struct {
 	DB *database.Queries
 }
 
+type authHandler func(http.ResponseWriter, *http.Request, database.User)
+
 func main() {
 	godotenv.Load()
 
@@ -44,7 +46,9 @@ func main() {
 	mux.HandleFunc("GET /v1/err", handlerErr)
 
 	mux.HandleFunc("POST /v1/users", apiCfg.handlerCreateUser)
-	mux.HandleFunc("GET /v1/users", apiCfg.handlerGetUser)
+	mux.HandleFunc("GET /v1/users", apiCfg.middlewareAuth(apiCfg.handlerGetUser))
+
+	mux.HandleFunc("POST /v1/feeds", apiCfg.middlewareAuth(apiCfg.handlerCreateFeed))
 
 	srv := &http.Server{
 		Addr:    ":" + port,

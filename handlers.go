@@ -46,20 +46,56 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request
 	respondWithJSON(w, http.StatusOK, databaseUserToUser(user))
 }
 
-func (cfg *apiConfig) handlerGetUser(w http.ResponseWriter, req *http.Request) {
-	apiKey, err := auth.ParseAuthHeader(req.Header, "ApiKey")
-	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Could not find API key")
-		return
-	}
+func (cfg *apiConfig) middlewareAuth(handler authHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		apiKey, err := auth.ParseAuthHeader(req.Header, "ApiKey")
+		if err != nil {
+			respondWithError(w, http.StatusUnauthorized, "Could not find API key")
+			return
+		}
 
-	user, err := cfg.DB.GetUserByAPIKey(req.Context(), apiKey)
-	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Could not get user")
-		return
-	}
+		user, err := cfg.DB.GetUserByAPIKey(req.Context(), apiKey)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound, "Could not get user")
+			return
+		}
 
+		handler(w, req, user)
+	}
+}
+
+func (cfg *apiConfig) handlerGetUser(w http.ResponseWriter, req *http.Request, user database.User) {
 	respondWithJSON(w, http.StatusOK, databaseUserToUser(user))
+}
+
+func (cfg *apiConfig) handlerCreateFeed(w http.ResponseWriter, req *http.Request, user database.User) {
+	type parameters struct {
+		Name string `json:"name"`
+		Url  string `json:"url"`
+	}
+
+	decoder := json.NewDecoder(req.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not decode parameters")
+		return
+	}
+
+	feed, err := cfg.DB.CreateFeed(req.Context(), database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+		Name:      params.Name,
+		Url:       params.Url,
+		UserID:    user.ID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not create feed")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, databaseFeedtoFeed(feed))
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
